@@ -815,18 +815,17 @@ class Knowledge:
                     else:
                         read_documents = []
 
-                # Set file_type and size from path if not already set
-                if not content.file_type:
-                    content.file_type = path.suffix
+                    if not content.file_type:
+                        content.file_type = path.suffix
 
-                if not content.size and content.file_data:
-                    content.size = len(content.file_data.content)  # type: ignore
-                if not content.size:
-                    try:
-                        content.size = path.stat().st_size
-                    except (OSError, IOError) as e:
-                        log_warning(f"Could not get file size for {path}: {e}")
-                        content.size = 0
+                    if not content.size and content.file_data:
+                        content.size = len(content.file_data.content)  # type: ignore
+                    if not content.size:
+                        try:
+                            content.size = path.stat().st_size
+                        except (OSError, IOError) as e:
+                            log_warning(f"Could not get file size for {path}: {e}")
+                            content.size = 0
 
                 if not content.id:
                     content.id = generate_id(content.content_hash or "")
@@ -1045,7 +1044,7 @@ class Knowledge:
                 else:
                     password = content.auth.password if content.auth and content.auth.password else None
                     source = bytes_content if bytes_content else content.url
-                    read_documents = await self._read_async(reader, source, name=name, password=password)
+                    read_documents = await self._read_with_reader_async(reader, source, name=name, password=password)
 
         except Exception as e:
             log_error(f"Error reading URL: {content.url} - {str(e)}")
