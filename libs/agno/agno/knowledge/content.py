@@ -48,6 +48,17 @@ class Content:
     created_at: Optional[int] = None
     updated_at: Optional[int] = None
     external_id: Optional[str] = None
+    # Multi-ingestion path fields
+    original_path: Optional[str] = None      # Absolute path - link mode only (INTERNAL)
+    storage_path: Optional[str] = None       # Absolute path - copy mode only (INTERNAL)
+    relative_path: Optional[str] = None      # Path from root (USER-VISIBLE)
+    root_id: Optional[str] = None            # FK to workspace_roots
+    root_path: Optional[str] = None          # Denormalized root path (INTERNAL)
+    root_label: Optional[str] = None         # Human-readable label (USER-VISIBLE)
+    source_type: Optional[str] = None        # local_file|local_folder|zip_extract|drag_drop|legacy
+    link_status: Optional[str] = None        # ok|broken (USER-VISIBLE)
+    link_checked_at: Optional[int] = None    # Unix timestamp
+    upload_batch_id: Optional[str] = None    # Batch tracking
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Content":
@@ -71,4 +82,14 @@ class Content:
             created_at=data.get("created_at"),
             updated_at=data.get("updated_at"),
             external_id=data.get("external_id"),
+            original_path=data.get("original_path"),
+            storage_path=data.get("storage_path"),
+            relative_path=data.get("relative_path"),
+            root_id=data.get("root_id"),
+            root_path=data.get("root_path"),
+            root_label=data.get("root_label"),
+            source_type=data.get("source_type"),
+            link_status=data.get("link_status"),
+            link_checked_at=data.get("link_checked_at"),
+            upload_batch_id=data.get("upload_batch_id"),
         )

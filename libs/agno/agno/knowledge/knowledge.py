@@ -2097,6 +2097,17 @@ class Knowledge:
                 status_message=safe_status_message,
                 created_at=created_at,
                 updated_at=updated_at,
+                # Multi-ingestion path fields
+                original_path=content.original_path,
+                storage_path=content.storage_path,
+                relative_path=content.relative_path,
+                root_id=content.root_id,
+                root_path=content.root_path,
+                root_label=content.root_label,
+                source_type=content.source_type,
+                link_status=content.link_status,
+                link_checked_at=content.link_checked_at,
+                upload_batch_id=content.upload_batch_id,
             )
             if isinstance(self.contents_db, AsyncBaseDb):
                 await self.contents_db.upsert_knowledge_content(knowledge_row=content_row)
@@ -2146,6 +2157,17 @@ class Knowledge:
                 status_message=safe_status_message,
                 created_at=created_at,
                 updated_at=updated_at,
+                # Multi-ingestion path fields
+                original_path=content.original_path,
+                storage_path=content.storage_path,
+                relative_path=content.relative_path,
+                root_id=content.root_id,
+                root_path=content.root_path,
+                root_label=content.root_label,
+                source_type=content.source_type,
+                link_status=content.link_status,
+                link_checked_at=content.link_checked_at,
+                upload_batch_id=content.upload_batch_id,
             )
             self.contents_db.upsert_knowledge_content(knowledge_row=content_row)
 
@@ -2188,6 +2210,27 @@ class Knowledge:
                 content_row.external_id = self._ensure_string_field(
                     content.external_id, "content.external_id", default=""
                 )
+            # Multi-ingestion path fields
+            if content.original_path is not None:
+                content_row.original_path = content.original_path
+            if content.storage_path is not None:
+                content_row.storage_path = content.storage_path
+            if content.relative_path is not None:
+                content_row.relative_path = content.relative_path
+            if content.root_id is not None:
+                content_row.root_id = content.root_id
+            if content.root_path is not None:
+                content_row.root_path = content.root_path
+            if content.root_label is not None:
+                content_row.root_label = content.root_label
+            if content.source_type is not None:
+                content_row.source_type = content.source_type
+            if content.link_status is not None:
+                content_row.link_status = content.link_status
+            if content.link_checked_at is not None:
+                content_row.link_checked_at = content.link_checked_at
+            if content.upload_batch_id is not None:
+                content_row.upload_batch_id = content.upload_batch_id
             content_row.updated_at = int(time.time())
             self.contents_db.upsert_knowledge_content(knowledge_row=content_row)
 
@@ -2225,6 +2268,27 @@ class Knowledge:
                 content_row.status_message = content.status_message if content.status_message else ""
             if content.external_id is not None:
                 content_row.external_id = content.external_id
+            # Multi-ingestion path fields
+            if content.original_path is not None:
+                content_row.original_path = content.original_path
+            if content.storage_path is not None:
+                content_row.storage_path = content.storage_path
+            if content.relative_path is not None:
+                content_row.relative_path = content.relative_path
+            if content.root_id is not None:
+                content_row.root_id = content.root_id
+            if content.root_path is not None:
+                content_row.root_path = content.root_path
+            if content.root_label is not None:
+                content_row.root_label = content.root_label
+            if content.source_type is not None:
+                content_row.source_type = content.source_type
+            if content.link_status is not None:
+                content_row.link_status = content.link_status
+            if content.link_checked_at is not None:
+                content_row.link_checked_at = content.link_checked_at
+            if content.upload_batch_id is not None:
+                content_row.upload_batch_id = content.upload_batch_id
 
             content_row.updated_at = int(time.time())
             log_debug(f"[_aupdate_content] About to upsert content_row with metadata: {content_row.metadata}")

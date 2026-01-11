@@ -21,6 +21,17 @@ class KnowledgeRow(BaseModel):
     created_at: Optional[int] = None
     updated_at: Optional[int] = None
     external_id: Optional[str] = None
+    # Multi-ingestion path fields (all nullable for backwards compatibility)
+    original_path: Optional[str] = None      # Absolute path - link mode only (INTERNAL)
+    storage_path: Optional[str] = None       # Absolute path - copy mode only (INTERNAL)
+    relative_path: Optional[str] = None      # Path from root (USER-VISIBLE)
+    root_id: Optional[str] = None            # FK to workspace_roots
+    root_path: Optional[str] = None          # Denormalized root path (INTERNAL)
+    root_label: Optional[str] = None         # Human-readable label (USER-VISIBLE)
+    source_type: Optional[str] = None        # local_file|local_folder|zip_extract|drag_drop|legacy
+    link_status: Optional[str] = None        # ok|broken (USER-VISIBLE)
+    link_checked_at: Optional[int] = None    # Unix timestamp
+    upload_batch_id: Optional[str] = None    # Batch tracking
 
     model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
 

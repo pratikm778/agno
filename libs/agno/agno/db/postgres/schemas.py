@@ -75,6 +75,17 @@ KNOWLEDGE_TABLE_SCHEMA = {
     "created_at": {"type": BigInteger, "nullable": True},
     "updated_at": {"type": BigInteger, "nullable": True},
     "external_id": {"type": String, "nullable": True},
+    # Multi-ingestion path fields
+    "original_path": {"type": Text, "nullable": True},         # Absolute - link mode (INTERNAL)
+    "storage_path": {"type": Text, "nullable": True},          # Absolute - copy mode (INTERNAL)
+    "relative_path": {"type": Text, "nullable": True},         # From root (USER-VISIBLE)
+    "root_id": {"type": String, "nullable": True},             # FK to workspace_roots
+    "root_path": {"type": Text, "nullable": True},             # Denormalized (INTERNAL)
+    "root_label": {"type": String, "nullable": True},          # Human-readable (USER-VISIBLE)
+    "source_type": {"type": String, "nullable": True},         # local_file|local_folder|zip_extract|drag_drop|legacy
+    "link_status": {"type": String, "nullable": True},         # ok|broken
+    "link_checked_at": {"type": BigInteger, "nullable": True}, # Unix timestamp
+    "upload_batch_id": {"type": String, "nullable": True},     # Batch tracking
 }
 
 METRICS_TABLE_SCHEMA = {
