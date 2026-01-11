@@ -73,13 +73,14 @@ KNOWLEDGE_TABLE_SCHEMA = {
     "original_path": {"type": String, "nullable": True},       # Absolute - link mode (INTERNAL)
     "storage_path": {"type": String, "nullable": True},        # Absolute - copy mode (INTERNAL)
     "relative_path": {"type": String, "nullable": True},       # From root (USER-VISIBLE)
-    "root_id": {"type": String, "nullable": True},             # FK to workspace_roots
-    "root_path": {"type": String, "nullable": True},           # Denormalized (INTERNAL)
+    "root_id": {"type": String, "nullable": True, "index": True},  # FK to workspace_roots
+    "root_path": {"type": String, "nullable": True, "index": True},  # Denormalized (INTERNAL)
     "root_label": {"type": String, "nullable": True},          # Human-readable (USER-VISIBLE)
-    "source_type": {"type": String, "nullable": True},         # local_file|local_folder|zip_extract|drag_drop|legacy
+    "source_type": {"type": String, "nullable": True, "index": True},  # local_file|local_folder|zip_extract|drag_drop|legacy
+    "parent_folder": {"type": String, "nullable": True},       # Parent folder name
     "link_status": {"type": String, "nullable": True},         # ok|broken
     "link_checked_at": {"type": BigInteger, "nullable": True}, # Unix timestamp
-    "upload_batch_id": {"type": String, "nullable": True},     # Batch tracking
+    "upload_batch_id": {"type": String, "nullable": True, "index": True},  # Batch tracking
 }
 
 METRICS_TABLE_SCHEMA = {

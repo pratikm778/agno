@@ -56,6 +56,7 @@ class Content:
     root_path: Optional[str] = None          # Denormalized root path (INTERNAL)
     root_label: Optional[str] = None         # Human-readable label (USER-VISIBLE)
     source_type: Optional[str] = None        # local_file|local_folder|zip_extract|drag_drop|legacy
+    parent_folder: Optional[str] = None      # Parent folder name (USER-VISIBLE)
     link_status: Optional[str] = None        # ok|broken (USER-VISIBLE)
     link_checked_at: Optional[int] = None    # Unix timestamp
     upload_batch_id: Optional[str] = None    # Batch tracking
@@ -89,6 +90,7 @@ class Content:
             root_path=data.get("root_path"),
             root_label=data.get("root_label"),
             source_type=data.get("source_type"),
+            parent_folder=data.get("parent_folder"),
             link_status=data.get("link_status"),
             link_checked_at=data.get("link_checked_at"),
             upload_batch_id=data.get("upload_batch_id"),

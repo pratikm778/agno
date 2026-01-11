@@ -2105,6 +2105,7 @@ class Knowledge:
                 root_path=content.root_path,
                 root_label=content.root_label,
                 source_type=content.source_type,
+                parent_folder=content.parent_folder,
                 link_status=content.link_status,
                 link_checked_at=content.link_checked_at,
                 upload_batch_id=content.upload_batch_id,
@@ -2165,6 +2166,7 @@ class Knowledge:
                 root_path=content.root_path,
                 root_label=content.root_label,
                 source_type=content.source_type,
+                parent_folder=content.parent_folder,
                 link_status=content.link_status,
                 link_checked_at=content.link_checked_at,
                 upload_batch_id=content.upload_batch_id,
@@ -2225,6 +2227,8 @@ class Knowledge:
                 content_row.root_label = content.root_label
             if content.source_type is not None:
                 content_row.source_type = content.source_type
+            if content.parent_folder is not None:
+                content_row.parent_folder = content.parent_folder
             if content.link_status is not None:
                 content_row.link_status = content.link_status
             if content.link_checked_at is not None:
@@ -2283,6 +2287,8 @@ class Knowledge:
                 content_row.root_label = content.root_label
             if content.source_type is not None:
                 content_row.source_type = content.source_type
+            if content.parent_folder is not None:
+                content_row.parent_folder = content.parent_folder
             if content.link_status is not None:
                 content_row.link_status = content.link_status
             if content.link_checked_at is not None:

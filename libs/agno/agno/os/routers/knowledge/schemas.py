@@ -33,6 +33,12 @@ class ContentResponseSchema(BaseModel):
     status_message: Optional[str] = Field(None, description="Status message or error details")
     created_at: Optional[datetime] = Field(None, description="Timestamp when content was created")
     updated_at: Optional[datetime] = Field(None, description="Timestamp when content was last updated")
+    # Multi-ingestion user-visible fields
+    relative_path: Optional[str] = Field(None, description="Path relative to the workspace root")
+    root_label: Optional[str] = Field(None, description="Human-readable label for the workspace root")
+    source_type: Optional[str] = Field(None, description="Source type: local_file|local_folder|zip_extract|drag_drop|legacy")
+    parent_folder: Optional[str] = Field(None, description="Parent folder name")
+    link_status: Optional[str] = Field(None, description="Link status: ok|broken")
 
     @classmethod
     def from_dict(cls, content: Dict[str, Any]) -> "ContentResponseSchema":
@@ -86,6 +92,12 @@ class ContentResponseSchema(BaseModel):
             # TODO: These fields are not available in the Content class. Fix the inconsistency
             access_count=None,
             linked_to=None,
+            # Multi-ingestion user-visible fields (internal paths are NOT included)
+            relative_path=content.get("relative_path"),
+            root_label=content.get("root_label"),
+            source_type=content.get("source_type"),
+            parent_folder=content.get("parent_folder"),
+            link_status=content.get("link_status"),
         )
 
 

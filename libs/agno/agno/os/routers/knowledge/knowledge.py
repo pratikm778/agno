@@ -566,6 +566,12 @@ def attach_routes(router: APIRouter, knowledge_instances: List[Union[Knowledge, 
                         "status_message": content.status_message,
                         "created_at": content.created_at,
                         "updated_at": content.updated_at,
+                        # Multi-ingestion user-visible fields (internal paths are NOT returned)
+                        "relative_path": content.relative_path,
+                        "root_label": content.root_label,
+                        "source_type": content.source_type,
+                        "parent_folder": content.parent_folder,
+                        "link_status": content.link_status,
                     }
                 )
                 for content in contents
@@ -636,6 +642,12 @@ def attach_routes(router: APIRouter, knowledge_instances: List[Union[Knowledge, 
                 "status_message": content.status_message,
                 "created_at": content.created_at,
                 "updated_at": content.updated_at,
+                # Multi-ingestion user-visible fields (internal paths are NOT returned)
+                "relative_path": content.relative_path,
+                "root_label": content.root_label,
+                "source_type": content.source_type,
+                "parent_folder": content.parent_folder,
+                "link_status": content.link_status,
             }
         )
 
@@ -660,7 +672,21 @@ def attach_routes(router: APIRouter, knowledge_instances: List[Union[Knowledge, 
         knowledge = get_knowledge_instance_by_db_id(knowledge_instances, db_id)
         content = await knowledge.aget_content_by_id(content_id=content_id)
 
-        file_path_value = content.metadata.get("file_path") if content and content.metadata else None
+        if not content:
+            raise HTTPException(status_code=404, detail="Content not found")
+
+        # Resolve file path with fallback chain:
+        # 1. storage_path (copy mode) - for ZIP/batch uploads
+        # 2. original_path (link mode) - for path-selected files
+        # 3. metadata["file_path"] (legacy) - for older uploads
+        file_path_value = None
+        if content.storage_path:
+            file_path_value = content.storage_path
+        elif content.original_path:
+            file_path_value = content.original_path
+        elif content.metadata and content.metadata.get("file_path"):
+            file_path_value = content.metadata.get("file_path")
+
         if not file_path_value:
             raise HTTPException(status_code=404, detail="File not found")
 
@@ -668,9 +694,18 @@ def attach_routes(router: APIRouter, knowledge_instances: List[Union[Knowledge, 
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="File not found on disk")
 
+        # Determine filename from metadata or path
+        filename = None
+        if content.metadata and content.metadata.get("original_filename"):
+            filename = content.metadata.get("original_filename")
+        elif content.name:
+            filename = content.name
+        else:
+            filename = file_path.name
+
         return FileResponse(
             path=file_path,
-            filename=content.metadata.get("original_filename", file_path.name) if content and content.metadata else None,
+            filename=filename,
         )
 
     @router.delete(
