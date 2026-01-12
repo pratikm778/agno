@@ -2,7 +2,7 @@ import json
 import logging
 import math
 from pathlib import Path as FilePath
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from fastapi import (
     APIRouter,
