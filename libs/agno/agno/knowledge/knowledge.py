@@ -2193,6 +2193,16 @@ class Knowledge:
                 log_warning(f"Content row not found for id: {content.id}, cannot update status")
                 return None
 
+            def _set_multi_field(field: str, value: Any) -> None:
+                # Backwards compatibility: some deployments may run with an older KnowledgeRow
+                # that doesn't have the multi-ingestion fields. In that case, fall back to metadata.
+                if hasattr(content_row, field):
+                    setattr(content_row, field, value)
+                else:
+                    if content_row.metadata is None:
+                        content_row.metadata = {}
+                    content_row.metadata[field] = value
+
             # Apply safe string handling for updates as well
             if content.name is not None:
                 content_row.name = self._ensure_string_field(content.name, "content.name", default="")
@@ -2214,27 +2224,27 @@ class Knowledge:
                 )
             # Multi-ingestion path fields
             if content.original_path is not None:
-                content_row.original_path = content.original_path
+                _set_multi_field("original_path", content.original_path)
             if content.storage_path is not None:
-                content_row.storage_path = content.storage_path
+                _set_multi_field("storage_path", content.storage_path)
             if content.relative_path is not None:
-                content_row.relative_path = content.relative_path
+                _set_multi_field("relative_path", content.relative_path)
             if content.root_id is not None:
-                content_row.root_id = content.root_id
+                _set_multi_field("root_id", content.root_id)
             if content.root_path is not None:
-                content_row.root_path = content.root_path
+                _set_multi_field("root_path", content.root_path)
             if content.root_label is not None:
-                content_row.root_label = content.root_label
+                _set_multi_field("root_label", content.root_label)
             if content.source_type is not None:
-                content_row.source_type = content.source_type
+                _set_multi_field("source_type", content.source_type)
             if content.parent_folder is not None:
-                content_row.parent_folder = content.parent_folder
+                _set_multi_field("parent_folder", content.parent_folder)
             if content.link_status is not None:
-                content_row.link_status = content.link_status
+                _set_multi_field("link_status", content.link_status)
             if content.link_checked_at is not None:
-                content_row.link_checked_at = content.link_checked_at
+                _set_multi_field("link_checked_at", content.link_checked_at)
             if content.upload_batch_id is not None:
-                content_row.upload_batch_id = content.upload_batch_id
+                _set_multi_field("upload_batch_id", content.upload_batch_id)
             content_row.updated_at = int(time.time())
             self.contents_db.upsert_knowledge_content(knowledge_row=content_row)
 
@@ -2259,6 +2269,16 @@ class Knowledge:
                 log_warning(f"Content row not found for id: {content.id}, cannot update status")
                 return None
 
+            def _set_multi_field(field: str, value: Any) -> None:
+                # Backwards compatibility: some deployments may run with an older KnowledgeRow
+                # that doesn't have the multi-ingestion fields. In that case, fall back to metadata.
+                if hasattr(content_row, field):
+                    setattr(content_row, field, value)
+                else:
+                    if content_row.metadata is None:
+                        content_row.metadata = {}
+                    content_row.metadata[field] = value
+
             if content.name is not None:
                 content_row.name = content.name
             if content.description is not None:
@@ -2274,27 +2294,27 @@ class Knowledge:
                 content_row.external_id = content.external_id
             # Multi-ingestion path fields
             if content.original_path is not None:
-                content_row.original_path = content.original_path
+                _set_multi_field("original_path", content.original_path)
             if content.storage_path is not None:
-                content_row.storage_path = content.storage_path
+                _set_multi_field("storage_path", content.storage_path)
             if content.relative_path is not None:
-                content_row.relative_path = content.relative_path
+                _set_multi_field("relative_path", content.relative_path)
             if content.root_id is not None:
-                content_row.root_id = content.root_id
+                _set_multi_field("root_id", content.root_id)
             if content.root_path is not None:
-                content_row.root_path = content.root_path
+                _set_multi_field("root_path", content.root_path)
             if content.root_label is not None:
-                content_row.root_label = content.root_label
+                _set_multi_field("root_label", content.root_label)
             if content.source_type is not None:
-                content_row.source_type = content.source_type
+                _set_multi_field("source_type", content.source_type)
             if content.parent_folder is not None:
-                content_row.parent_folder = content.parent_folder
+                _set_multi_field("parent_folder", content.parent_folder)
             if content.link_status is not None:
-                content_row.link_status = content.link_status
+                _set_multi_field("link_status", content.link_status)
             if content.link_checked_at is not None:
-                content_row.link_checked_at = content.link_checked_at
+                _set_multi_field("link_checked_at", content.link_checked_at)
             if content.upload_batch_id is not None:
-                content_row.upload_batch_id = content.upload_batch_id
+                _set_multi_field("upload_batch_id", content.upload_batch_id)
 
             content_row.updated_at = int(time.time())
             log_debug(f"[_aupdate_content] About to upsert content_row with metadata: {content_row.metadata}")

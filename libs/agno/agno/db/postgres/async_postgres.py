@@ -31,7 +31,7 @@ from agno.utils.log import log_debug, log_error, log_info, log_warning
 from agno.utils.string import sanitize_postgres_string, sanitize_postgres_strings
 
 try:
-    from sqlalchemy import ForeignKey, Index, String, Table, UniqueConstraint, and_, case, func, or_, update
+    from sqlalchemy import ForeignKey, Index, String, Table, UniqueConstraint, and_, case, func, literal, or_, update
     from sqlalchemy.dialects import postgresql
     from sqlalchemy.dialects.postgresql import TIMESTAMP
     from sqlalchemy.exc import ProgrammingError
@@ -640,9 +640,8 @@ class AsyncPostgresDb(AsyncBaseDb):
 
                 # Filter by workspace_id in metadata (enables proper workspace isolation with correct pagination)
                 if metadata_workspace_id is not None:
-                    stmt = stmt.where(
-                        func.coalesce(table.c.metadata["workspace_id"].astext, "") == metadata_workspace_id
-                    )
+                    workspace_id_value = func.jsonb_extract_path_text(table.c.metadata, literal("workspace_id"))
+                    stmt = stmt.where(func.coalesce(workspace_id_value, "") == metadata_workspace_id)
 
                 count_stmt = select(func.count()).select_from(stmt.alias())
                 total_count = await sess.scalar(count_stmt) or 0
