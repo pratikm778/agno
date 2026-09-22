@@ -1556,10 +1556,10 @@ def _build_continue_run_messages(
     if add_history_to_context and session is not None and not input_has_history:
         from dataclasses import replace
 
-        # Background continuation has already persisted RUNNING. Exclude the
-        # current identity before applying history limits, regardless of status.
-        continued_run_id = current_run_id or (run_context.run_id if run_context else None)
-        history_session = replace(session, runs=[run for run in session.runs or [] if run.run_id != continued_run_id])
+        # Background continuation has already persisted this run. Exclude it by the
+        # caller's explicit id (RunContext.run_id is stale after a fork) before
+        # applying history limits, regardless of status.
+        history_session = replace(session, runs=[run for run in session.runs or [] if run.run_id != current_run_id])
 
         # Only skip messages from history when system_message_role is NOT a standard conversation role.
         # Standard conversation roles ("user", "assistant", "tool") should never be filtered

@@ -34,6 +34,7 @@ def test_resume_preserves_previous_turn_and_current_tool_transcript_once(status)
         input=current_messages,
         session=session,
         run_context=context,
+        current_run_id="current",
     )
 
     assert [m.content for m in result.messages] == [
@@ -68,11 +69,12 @@ def test_current_resume_does_not_consume_a_previous_run_history_slot():
         input=current_messages,
         session=session,
         run_context=RunContext(run_id="current", session_id="session"),
+        current_run_id="current",
     )
     assert [m.content for m in result.messages] == ["previous", "current"]
 
 
-def test_explicit_current_identity_takes_precedence_over_original_context():
+def test_forked_resume_excludes_its_own_id_not_the_pre_fork_context_id():
     agent = Agent(add_history_to_context=True)
     agent.num_history_runs = None
     original = RunOutput(
