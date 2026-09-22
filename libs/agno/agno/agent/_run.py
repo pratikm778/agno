@@ -1228,6 +1228,8 @@ def _run_stream(
                         user_id=user_id,
                     )
                 yield run_error
+                if yield_run_output:
+                    yield run_response
                 break
             except KeyboardInterrupt:
                 run_response = _handle_run_cancellation(run_response, KeyboardInterrupt(), run_messages)
@@ -1288,6 +1290,8 @@ def _run_stream(
                     )
 
                 yield run_error
+                if yield_run_output:
+                    yield run_response
     finally:
         # Cancel background futures on error (wait_for_thread_tasks_stream handles waiting on success)
         for future in (memory_future, learning_future):
@@ -2724,6 +2728,8 @@ async def _arun_stream(
 
                 # Yield the error event
                 yield run_error
+                if yield_run_output:
+                    yield run_response
                 break
 
             except (KeyboardInterrupt, asyncio.CancelledError, GeneratorExit) as cancel_exc:
@@ -2801,6 +2807,8 @@ async def _arun_stream(
 
                 # Yield the error event
                 yield run_error
+                if yield_run_output:
+                    yield run_response
     finally:
         # Always disconnect connectable tools
         disconnect_connectable_tools(agent)
@@ -3708,6 +3716,7 @@ def continue_run_dispatch(
         session=agent_session,
         add_history_to_context=agent.add_history_to_context,
         run_context=run_context,
+        current_run_id=run_response.run_id,
     )
 
     # Reset the run state
@@ -4222,6 +4231,8 @@ def _continue_run_stream(
                     agent, run_response=run_response, session=session, run_context=run_context, user_id=user_id
                 )
                 yield run_error
+                if yield_run_output:
+                    yield run_response
                 break
             except KeyboardInterrupt:
                 run_response = _handle_run_cancellation(run_response, KeyboardInterrupt(), run_messages)
@@ -4274,6 +4285,8 @@ def _continue_run_stream(
                 )
 
                 yield run_error
+                if yield_run_output:
+                    yield run_response
     finally:
         # Always disconnect connectable tools
         disconnect_connectable_tools(agent)
@@ -4707,12 +4720,6 @@ async def _acontinue_run_background_stream(
             if slot_held:
                 await slot_cm.__aexit__(None, None, None)
 
-            # Signal primary queue FIRST — unblocks the original client
-            try:
-                await sse_queue.put(None)
-            except Exception:
-                log_warning(f"Failed to signal primary queue for continue-run {_run_id} completion")
-
             # Mark run terminal in the event stream and wake all tails
             # (shielded to survive task cancellation)
             try:
@@ -4738,6 +4745,13 @@ async def _acontinue_run_background_stream(
                 await asyncio.shield(event_stream.complete_run(_run_id, final_status))
             except (Exception, asyncio.CancelledError):
                 log_warning(f"Failed to mark continue-run {_run_id} as completed in event stream")
+
+            # End the client stream after producer-owned completion settles;
+            # the caller may immediately continue this same run again.
+            try:
+                await sse_queue.put(None)
+            except Exception:
+                log_warning(f"Failed to signal primary queue for continue-run {_run_id} completion")
 
     task = asyncio.create_task(_background_producer())
     _background_tasks.add(task)
@@ -5029,6 +5043,8 @@ async def _acontinue_run(
                     input=input_messages,
                     session=agent_session,
                     add_history_to_context=agent.add_history_to_context,
+                    run_context=run_context,
+                    current_run_id=run_response.run_id,
                 )
 
                 # Reset the run state
@@ -5552,6 +5568,8 @@ async def _acontinue_run_stream(
                     input=input_messages,
                     session=agent_session,
                     add_history_to_context=agent.add_history_to_context,
+                    run_context=run_context,
+                    current_run_id=run_response.run_id,
                 )
 
                 # Reset the run state
@@ -5824,6 +5842,8 @@ async def _acontinue_run_stream(
 
                 # Yield the error event
                 yield run_error
+                if yield_run_output:
+                    yield run_response
                 break
             except (KeyboardInterrupt, asyncio.CancelledError, GeneratorExit) as cancel_exc:
                 if run_response is None:
@@ -5913,6 +5933,8 @@ async def _acontinue_run_stream(
 
                 # Yield the error event
                 yield run_error
+                if yield_run_output:
+                    yield run_response
     finally:
         # Always disconnect connectable tools
         disconnect_connectable_tools(agent)
@@ -6234,44 +6256,13 @@ def flush_in_flight_messages_on_error(
     run_response: RunOutput,
     run_messages: Optional["RunMessages"],
 ) -> None:
-    """Copy in-flight conversation into ``run_response.messages`` for the
-    terminal ERROR write.
+    """Persist the latest complete exchanges before a terminal ERROR write.
 
-    During a normal run, ``run_response.messages`` is populated by
-    ``update_run_response`` only **after** the model loop returns
-    successfully. If the model loop raises (e.g. provider API failure,
-    malformed response, exception in a pre-hook) before any tool batch
-    boundary fires, neither ``update_run_response`` nor the mid-run
-    checkpoint hook has a chance to flush ``run_messages.messages`` into
-    ``run_response.messages``. The terminal ERROR write would then persist
-    an empty-message row, losing the conversation that led to the failure
-    and making post-mortem debugging impossible.
-
-    Call this from every ``except Exception`` block right before
-    ``cleanup_and_store``. It only sets ``run_response.messages`` if it's
-    still empty — preserves a partial state that the mid-run hook already
-    captured.
-
-    The filter ``m.add_to_agent_memory`` mirrors what the checkpoint hook
-    does, so the persisted shape is consistent regardless of which path
-    captured it.
-
-    KNOWN GAP (tombstone): the detached background wrappers
-    (_background_task / _background_producer) do NOT flush - run_messages
-    lives inside _arun*/_acontinue_run*, never in the wrappers' locals, so
-    their old locals().get("run_messages") calls were unconditional no-ops
-    and were deleted rather than left implying coverage. A background run
-    that errors at the WRAPPER level (outside the inner run's own error
-    handling) persists without its in-flight conversation. Threading the
-    real flush out to the wrappers - with a wrapper-level-error test -
-    is a known follow-up.
+    A pause or checkpoint may already have populated messages. That snapshot
+    must not suppress exchanges completed during the continued model loop.
+    Without current context, retain the previously stored transcript.
     """
     if run_messages is None:
-        return
-    if run_response.messages:
-        # Already populated (e.g. by a mid-run checkpoint hook). Don't
-        # overwrite — it may be more complete than run_messages.messages
-        # if intervening processing happened.
         return
     if not run_messages.messages:
         return

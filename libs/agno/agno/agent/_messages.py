@@ -1506,6 +1506,7 @@ def _build_continue_run_messages(
     session: Optional[AgentSession] = None,
     add_history_to_context: Optional[bool] = None,
     run_context: Optional[RunContext] = None,
+    current_run_id: Optional[str] = None,
 ) -> RunMessages:
     """This function returns a RunMessages object with the following attributes:
         - system_message: The system message for this run
@@ -1553,6 +1554,13 @@ def _build_continue_run_messages(
 
     # 2. Add history messages if not already present in input
     if add_history_to_context and session is not None and not input_has_history:
+        from dataclasses import replace
+
+        # Background continuation has already persisted RUNNING. Exclude the
+        # current identity before applying history limits, regardless of status.
+        continued_run_id = current_run_id or (run_context.run_id if run_context else None)
+        history_session = replace(session, runs=[run for run in session.runs or [] if run.run_id != continued_run_id])
+
         # Only skip messages from history when system_message_role is NOT a standard conversation role.
         # Standard conversation roles ("user", "assistant", "tool") should never be filtered
         # to preserve conversation continuity.
@@ -1560,7 +1568,7 @@ def _build_continue_run_messages(
             agent.system_message_role if agent.system_message_role not in ["user", "assistant", "tool"] else None
         )
 
-        history: List[Message] = session.get_messages(
+        history: List[Message] = history_session.get_messages(
             last_n_runs=agent.num_history_runs,
             limit=agent.num_history_messages,
             skip_roles=[skip_role] if skip_role else None,
@@ -1595,12 +1603,15 @@ def get_continue_run_messages(
     session: Optional[AgentSession] = None,
     add_history_to_context: Optional[bool] = None,
     run_context: Optional[RunContext] = None,
+    current_run_id: Optional[str] = None,
 ) -> RunMessages:
     """Build the messages that resume a paused run, reading offloaded media back first.
 
     The paused run's own messages come off the database carrying a reference and no bytes.
     """
-    run_messages = _build_continue_run_messages(agent, input, session, add_history_to_context, run_context)
+    run_messages = _build_continue_run_messages(
+        agent, input, session, add_history_to_context, run_context, current_run_id
+    )
     media_storage = _resolve_media_storage(agent)
     if media_storage is not None:
         from agno.utils.media_offload import refresh_messages_media
@@ -1615,9 +1626,12 @@ async def aget_continue_run_messages(
     session: Optional[AgentSession] = None,
     add_history_to_context: Optional[bool] = None,
     run_context: Optional[RunContext] = None,
+    current_run_id: Optional[str] = None,
 ) -> RunMessages:
     """Async variant of :func:`get_continue_run_messages`."""
-    run_messages = _build_continue_run_messages(agent, input, session, add_history_to_context, run_context)
+    run_messages = _build_continue_run_messages(
+        agent, input, session, add_history_to_context, run_context, current_run_id
+    )
     media_storage = _resolve_media_storage(agent)
     if media_storage is not None:
         from agno.utils.media_offload import arefresh_messages_media

@@ -15,6 +15,7 @@ on:
       - "v2.6.0"
       - "feat/v2.7" # Sub-PRs into the release branch get the same gate
       - "feat/v3.0" # Sub-PRs into the 3.0 line get the same gate
+      - "codex/upstream-cffd892a9" # Personal-fork-only validation of the retained v3 patches
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
