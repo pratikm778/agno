@@ -653,16 +653,19 @@ def handle_external_execution_update(
             # envelope too, so the persisted session row stays small.
             if isinstance(tool.result, str):
                 tool.result = _offload_continue_result(agent, run_response, tool, tool.result)
-            run_messages.messages.append(
-                Message(
-                    role=agent.model.tool_message_role,
-                    content=tool.result,
-                    tool_call_id=tool.tool_call_id,
-                    tool_name=tool.tool_name,
-                    tool_args=tool.tool_args,
-                    tool_call_error=tool.tool_call_error,
-                    stop_after_tool_call=tool.stop_after_tool_call,
-                )
+            _insert_tool_results_in_call_order(
+                run_messages,
+                [
+                    Message(
+                        role=agent.model.tool_message_role,
+                        content=tool.result,
+                        tool_call_id=tool.tool_call_id,
+                        tool_name=tool.tool_name,
+                        tool_args=tool.tool_args,
+                        tool_call_error=tool.tool_call_error,
+                        stop_after_tool_call=tool.stop_after_tool_call,
+                    )
+                ],
             )
         tool.external_execution_required = False
     else:
@@ -691,15 +694,18 @@ def handle_get_user_input_tool_update(
     ]
     content = f"User inputs retrieved: {json.dumps(user_input_result, ensure_ascii=False)}"
     # Add the tool call result to the run_messages
-    run_messages.messages.append(
-        Message(
-            role=agent.model.tool_message_role,
-            content=_offload_continue_result(agent, run_response, tool, content),
-            tool_call_id=tool.tool_call_id,
-            tool_name=tool.tool_name,
-            tool_args=tool.tool_args,
-            metrics=MessageMetrics(duration=0),
-        )
+    _insert_tool_results_in_call_order(
+        run_messages,
+        [
+            Message(
+                role=agent.model.tool_message_role,
+                content=_offload_continue_result(agent, run_response, tool, content),
+                tool_call_id=tool.tool_call_id,
+                tool_name=tool.tool_name,
+                tool_args=tool.tool_args,
+                metrics=MessageMetrics(duration=0),
+            )
+        ],
     )
 
 
@@ -715,15 +721,18 @@ def handle_ask_user_tool_update(
         {"question": q.question, "selected": q.selected_options or []} for q in tool.user_feedback_schema
     ]
     content = f"User feedback received: {json.dumps(feedback_result, ensure_ascii=False)}"
-    run_messages.messages.append(
-        Message(
-            role=agent.model.tool_message_role,
-            content=_offload_continue_result(agent, run_response, tool, content),
-            tool_call_id=tool.tool_call_id,
-            tool_name=tool.tool_name,
-            tool_args=tool.tool_args,
-            metrics=MessageMetrics(duration=0),
-        )
+    _insert_tool_results_in_call_order(
+        run_messages,
+        [
+            Message(
+                role=agent.model.tool_message_role,
+                content=_offload_continue_result(agent, run_response, tool, content),
+                tool_call_id=tool.tool_call_id,
+                tool_name=tool.tool_name,
+                tool_args=tool.tool_args,
+                metrics=MessageMetrics(duration=0),
+            )
+        ],
     )
 
 
@@ -759,6 +768,46 @@ async def _amaybe_create_audit_approval(
             agent_id=agent.id,
             agent_name=agent.name,
         )
+
+
+def _insert_tool_results_in_call_order(run_messages: RunMessages, function_call_results: List[Message]) -> None:
+    """Insert resumed tool results in their original assistant-call order."""
+
+    for result in function_call_results:
+        if result.tool_call_id is None:
+            run_messages.messages.append(result)
+            continue
+
+        assistant_index: Optional[int] = None
+        call_ids: List[str] = []
+        for index in range(len(run_messages.messages) - 1, -1, -1):
+            message = run_messages.messages[index]
+            if message.role != "assistant" or not message.tool_calls:
+                continue
+            candidate_ids: List[str] = []
+            for tool_call in message.tool_calls:
+                tool_call_id = tool_call.get("id")
+                if isinstance(tool_call_id, str):
+                    candidate_ids.append(tool_call_id)
+            if result.tool_call_id in candidate_ids:
+                assistant_index = index
+                call_ids = candidate_ids
+                break
+
+        if assistant_index is None:
+            run_messages.messages.append(result)
+            continue
+
+        result_order = call_ids.index(result.tool_call_id)
+        insert_at = assistant_index + 1
+        while insert_at < len(run_messages.messages):
+            existing = run_messages.messages[insert_at]
+            if existing.role != "tool" or existing.tool_call_id not in call_ids:
+                break
+            if call_ids.index(existing.tool_call_id) > result_order:
+                break
+            insert_at += 1
+        run_messages.messages.insert(insert_at, result)
 
 
 def run_tool(
@@ -860,20 +909,27 @@ def run_tool(
                 yield call_result  # type: ignore
 
     if len(function_call_results) > 0:
-        run_messages.messages.extend(function_call_results)
+        _insert_tool_results_in_call_order(run_messages, function_call_results)
 
 
 def reject_tool_call(
     agent: Agent, run_messages: RunMessages, tool: ToolExecution, functions: Optional[Dict[str, Function]] = None
 ):
+    """Settle a persisted proposal even when the current tool surface changed."""
     agent.model = cast(Model, agent.model)
-    function_call = agent.model.get_function_call_to_run_from_tool_execution(tool, functions)
-    function_call.error = tool.confirmation_note or "Function call was rejected by the user"
-    function_call_result = agent.model.create_function_call_result(
-        function_call=function_call,
-        success=False,
+    _insert_tool_results_in_call_order(
+        run_messages,
+        [
+            Message(
+                role=agent.model.tool_message_role,
+                content=tool.confirmation_note or "Function call was rejected by the user",
+                tool_call_id=tool.tool_call_id,
+                tool_name=tool.tool_name,
+                tool_args=tool.tool_args,
+                tool_call_error=True,
+            )
+        ],
     )
-    run_messages.messages.append(function_call_result)
 
 
 async def arun_tool(
@@ -975,7 +1031,7 @@ async def arun_tool(
                 yield call_result  # type: ignore
 
     if len(function_call_results) > 0:
-        run_messages.messages.extend(function_call_results)
+        _insert_tool_results_in_call_order(run_messages, function_call_results)
 
 
 def handle_tool_call_updates(
@@ -986,7 +1042,7 @@ def handle_tool_call_updates(
 
     for _t in run_response.tools or []:
         # Case 1: Handle confirmed tools and execute them
-        if _t.requires_confirmation is not None and _t.requires_confirmation is True and _functions:
+        if _t.requires_confirmation is True and (_functions or _t.confirmed is False):
             # Tool is confirmed and hasn't been run before
             if _t.confirmed is not None and _t.confirmed is True and _t.result is None:
                 # Consume the generator without yielding
@@ -1038,7 +1094,7 @@ def handle_tool_call_updates_stream(
 
     for _t in run_response.tools or []:
         # Case 1: Handle confirmed tools and execute them
-        if _t.requires_confirmation is not None and _t.requires_confirmation is True and _functions:
+        if _t.requires_confirmation is True and (_functions or _t.confirmed is False):
             # Tool is confirmed and hasn't been run before
             if _t.confirmed is not None and _t.confirmed is True and _t.result is None:
                 yield from run_tool(
@@ -1088,7 +1144,7 @@ async def ahandle_tool_call_updates(
 
     for _t in run_response.tools or []:
         # Case 1: Handle confirmed tools and execute them
-        if _t.requires_confirmation is not None and _t.requires_confirmation is True and _functions:
+        if _t.requires_confirmation is True and (_functions or _t.confirmed is False):
             # Tool is confirmed and hasn't been run before
             if _t.confirmed is not None and _t.confirmed is True and _t.result is None:
                 async for _ in arun_tool(agent, run_response, run_messages, _t, functions=_functions):
@@ -1148,7 +1204,7 @@ async def ahandle_tool_call_updates_stream(
 
     for _t in run_response.tools or []:
         # Case 1: Handle confirmed tools and execute them
-        if _t.requires_confirmation is not None and _t.requires_confirmation is True and _functions:
+        if _t.requires_confirmation is True and (_functions or _t.confirmed is False):
             # Tool is confirmed and hasn't been run before
             if _t.confirmed is not None and _t.confirmed is True and _t.result is None:
                 async for event in arun_tool(
